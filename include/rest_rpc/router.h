@@ -16,13 +16,13 @@ class connection;
 class router : asio::noncopyable {
 public:
   template <ExecMode model, typename Function>
-  void register_handler(std::string const &name, Function f) {
+  [[nodiscard]] bool register_handler(std::string const &name, Function f) {
     return register_nonmember_func<model>(name, std::move(f));
   }
 
   template <ExecMode model, typename Function, typename Self>
-  void register_handler(std::string const &name, const Function &f,
-                        Self *self) {
+  [[nodiscard]] bool register_handler(std::string const &name,
+                                      const Function &f, Self *self) {
     return register_member_func<model>(name, f, self);
   }
 
@@ -164,20 +164,26 @@ private:
   };
 
   template <ExecMode model, typename Function>
-  void register_nonmember_func(std::string const &name, Function f) {
-    this->map_invokers_[name] = {std::bind(
-        &invoker<Function>::template apply<model>, std::move(f),
-        std::placeholders::_1, std::placeholders::_2, std::placeholders::_3,
-        std::placeholders::_4, std::placeholders::_5)};
+  bool register_nonmember_func(std::string const &name, Function f) {
+    return map_invokers_
+        .emplace(name, std::bind(&invoker<Function>::template apply<model>,
+                                 std::move(f), std::placeholders::_1,
+                                 std::placeholders::_2, std::placeholders::_3,
+                                 std::placeholders::_4, std::placeholders::_5))
+        .second;
   }
 
   template <ExecMode model, typename Function, typename Self>
-  void register_member_func(const std::string &name, const Function &f,
+  bool register_member_func(const std::string &name, const Function &f,
                             Self *self) {
-    this->map_invokers_[name] = {std::bind(
-        &invoker<Function>::template apply_member<model, Self>, f, self,
-        std::placeholders::_1, std::placeholders::_2, std::placeholders::_3,
-        std::placeholders::_4, std::placeholders::_5)};
+    return map_invokers_
+        .emplace(
+            name,
+            std::bind(&invoker<Function>::template apply_member<model, Self>, f,
+                      self, std::placeholders::_1, std::placeholders::_2,
+                      std::placeholders::_3, std::placeholders::_4,
+                      std::placeholders::_5))
+        .second;
   }
 
   std::unordered_map<

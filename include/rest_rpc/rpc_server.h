@@ -54,13 +54,13 @@ public:
 
   template <ExecMode model = ExecMode::sync, typename Function>
   void register_handler(std::string const &name, const Function &f) {
-    router_.register_handler<model>(name, f);
+    assert(router_.register_handler<model>(name, f));
   }
 
   template <ExecMode model = ExecMode::sync, typename Function, typename Self>
   void register_handler(std::string const &name, const Function &f,
                         Self *self) {
-    router_.register_handler<model>(name, f, self);
+    assert(router_.register_handler<model>(name, f, self));
   }
 
   void set_conn_timeout_callback(std::function<void(int64_t)> callback) {
