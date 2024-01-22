@@ -27,3 +27,6 @@ TEST_CASE("test_sync_add") {
     auto result = client.call<int>("add", 1, 2);
     CHECK_EQ(result, 3);
 }
+TEST_CASE("for ci test") {
+  CHECK(true);
+}
