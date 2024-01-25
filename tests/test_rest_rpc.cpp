@@ -96,8 +96,7 @@ TEST_CASE("test_client_reconnect") {
       } catch (const std::exception &ex) {
         std::cout << ex.what() << std::endl;
       }
-    }
-    else {
+    } else {
       count++;
     }
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
