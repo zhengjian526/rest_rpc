@@ -75,6 +75,35 @@ TEST_CASE("test_client_async_connect") {
   }
 }
 
+TEST_CASE("test_client_reconnect") {
+  rpc_client client;
+  client.enable_auto_reconnect(); // automatic reconnect
+  client.enable_auto_heartbeat(); // automatic heartbeat
+  client.connect("127.0.0.1", 9000);
+
+  rpc_server server(9000, std::thread::hardware_concurrency());
+  dummy d;
+  server.register_handler("add", &dummy::add, &d);
+  server.async_run();
+
+  int count = 0;
+  while (true) {
+    if (client.has_connected()) {
+      try {
+        auto result = client.call<int>("add", 1, 2);
+        CHECK_EQ(result, 3);
+        break;
+      } catch (const std::exception &ex) {
+        std::cout << ex.what() << std::endl;
+      }
+    }
+    else {
+      count++;
+    }
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+  }
+}
+
 TEST_CASE("test_client_sync_call") {
   rpc_server server(9000, std::thread::hardware_concurrency());
   dummy d;
