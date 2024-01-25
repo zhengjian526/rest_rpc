@@ -128,14 +128,14 @@ TEST_CASE("test_client_async_call") {
   auto fu = client.async_call<FUTURE>("hello", "purecpp");
   fu.get().as(); // no return
 }
-// TEST_CASE("test_client_async_call_not_connect") {
-//   rpc_client client("127.0.0.1", 9001);
-//   client.async_call<>("get_person",
-//                       [](const asio::error_code &ec, string_view data) {
-//                         CHECK_EQ(ec, asio::error::not_connected);
-//                         CHECK_EQ(data, "not connected");
-//                       });
-// }
+TEST_CASE("test_client_async_call_not_connect") {
+  rpc_client client("127.0.0.1", 9001);
+  client.async_call<>("get_person",
+                      [](const asio::error_code &ec, string_view data) {
+                        CHECK_EQ(ec, asio::error::not_connected);
+                        CHECK_EQ(data, "not connected");
+                      });
+}
 
 TEST_CASE("test_client_async_call_with_timeout") {
   rpc_server server(9000, std::thread::hardware_concurrency());
