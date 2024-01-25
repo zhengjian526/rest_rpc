@@ -171,7 +171,7 @@ TEST_CASE("test_client_subscribe") {
                           });
   bool stop = false;
   std::thread thd([&server, &stop] {
-    while (! stop) {
+    while (!stop) {
       server.publish("key", "hello subscriber");
       std::this_thread::sleep_for(std::chrono::milliseconds(50));
     }
@@ -193,7 +193,7 @@ TEST_CASE("test_client_subscribe_by_token") {
   rpc_server server(9000, std::thread::hardware_concurrency());
   bool stop = false;
   std::thread thd([&server, &stop] {
-    while (! stop) {
+    while (!stop) {
       auto list = server.get_token_list();
       for (auto &token : list) {
         server.publish_by_token("key", token, "hello token subscriber");
