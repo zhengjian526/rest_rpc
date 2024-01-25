@@ -89,6 +89,18 @@ TEST_CASE("test_client_sync_call") {
   CHECK_EQ(result, 3);
 }
 
+TEST_CASE("test_client_sync_call_return_void") {
+  rpc_server server(9000, std::thread::hardware_concurrency());
+  server.register_handler("echo", echo);
+  server.async_run();
+  std::this_thread::sleep_for(std::chrono::milliseconds(300));
+
+  rpc_client client("127.0.0.1", 9000);
+  bool r = client.connect();
+  CHECK(r);
+  client.call<>("echo");
+}
+
 TEST_CASE("test_client_async_call") {
   rpc_server server(9000, std::thread::hardware_concurrency());
   server.register_handler("get_person", get_person);
@@ -139,8 +151,67 @@ TEST_CASE("test_client_async_call_with_timeout") {
   client.async_call<0>(
       "echo",
       [](const asio::error_code &ec, string_view data) {
-        auto str = as<std::string>(data);
-        std::cout << "echo " << str << '\n';
+        std::cout << "error code " << ec << ", err msg: " << data << '\n';
       },
       test);
+  client.async_call<>(
+      "echo",
+      [](const asio::error_code &ec, string_view data) {
+        std::cout << "error code " << ec << ", err msg: " << data << '\n';
+      },
+      test);
+}
+
+TEST_CASE("test_client_subscribe") {
+  rpc_server server(9000, std::thread::hardware_concurrency());
+  server.register_handler("publish",
+                          [&server](rpc_conn conn, std::string key,
+                                    std::string token, std::string val) {
+                            server.publish(std::move(key), std::move(val));
+                          });
+  bool stop = false;
+  std::thread thd([&server, &stop] {
+    while (! stop) {
+      server.publish("key", "hello subscriber");
+      std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    }
+  });
+  server.async_run();
+  std::this_thread::sleep_for(std::chrono::milliseconds(300));
+  rpc_client client;
+  bool r = client.connect("127.0.0.1", 9000);
+  CHECK(r);
+  client.subscribe("key", [&stop](string_view data) {
+    std::cout << data << "\n";
+    CHECK_EQ(data, "hello subscriber");
+    stop = true;
+  });
+  thd.join();
+}
+
+TEST_CASE("test_client_subscribe_by_token") {
+  rpc_server server(9000, std::thread::hardware_concurrency());
+  bool stop = false;
+  std::thread thd([&server, &stop] {
+    while (! stop) {
+      auto list = server.get_token_list();
+      for (auto &token : list) {
+        server.publish_by_token("key", token, "hello token subscriber");
+      }
+      std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    }
+  });
+  server.async_run();
+  std::this_thread::sleep_for(std::chrono::milliseconds(300));
+  rpc_client client;
+  bool r = client.connect("127.0.0.1", 9000);
+  CHECK(r);
+  client.subscribe(
+      "key", "048a796c8a3c6a6b7bd1223bf2c8cee05232e927b521984ba417cb2fca6df9d1",
+      [&stop](string_view data) {
+        std::cout << data << "\n";
+        CHECK_EQ(data, "hello token subscriber");
+        stop = true;
+      });
+  thd.join();
 }
