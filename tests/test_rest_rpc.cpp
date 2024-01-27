@@ -23,14 +23,14 @@ struct person {
 };
 person get_person(rpc_conn conn) { return {1, "tom", 20}; }
 
-void server_user_data(rpc_conn conn) { 
+void server_user_data(rpc_conn conn) {
   auto shared_conn = conn.lock();
   if (shared_conn) {
     shared_conn->set_user_data(std::string("aa"));
     auto s = conn.lock()->get_user_data<std::string>();
     CHECK_EQ(s, "aa");
   }
-  return; 
+  return;
 }
 
 void hello(rpc_conn conn, const std::string &str) {
@@ -263,7 +263,6 @@ TEST_CASE("test_server_publish_encode_msg") {
   });
   thd.join();
 }
-
 
 TEST_CASE("test_client_subscribe_by_token") {
   rpc_server server(9000, std::thread::hardware_concurrency());
