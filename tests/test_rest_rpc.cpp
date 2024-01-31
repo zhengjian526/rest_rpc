@@ -252,6 +252,19 @@ TEST_CASE("test_client_async_call_with_timeout") {
           std::cout << "error code: " << ec << ", err msg: " << data << '\n';
       },
       test);
+  client.async_call<>(
+      "get_person",
+      [&client](const asio::error_code &ec, string_view data) {
+        if (ec) {
+          std::cout << "error code: " << ec << ", err msg: " << data << '\n';
+          return;
+        }
+        auto p = as<person>(data);
+        CHECK_EQ(p.id, 1);
+        CHECK_EQ(p.age, 20);
+        CHECK_EQ(p.name, "tom");
+      },
+      test);
   auto f = client.async_call<FUTURE>("get_person");
   if (f.wait_for(std::chrono::milliseconds(500)) ==
       std::future_status::timeout) {
