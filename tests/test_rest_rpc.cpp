@@ -4,6 +4,7 @@
 #include <iostream>
 #include <rest_rpc.hpp>
 #include <thread>
+#include <vector>
 
 using namespace rest_rpc;
 using namespace rpc_service;
@@ -485,4 +486,35 @@ TEST_CASE("test_server_delay_response") {
   CHECK(r);
   auto result = client.call<std::string>("delay_echo", "test_delay_echo");
   CHECK_EQ(result, "test_delay_echo");
+}
+
+TEST_CASE("test_client_req_result_default_constructor") {
+  req_result rr;
+  CHECK(!rr.success());
+  try {
+    rr.as();
+  } catch (const std::exception &ex) {
+    std::cout << ex.what() << std::endl;
+  }
+}
+TEST_CASE("test_client_req_result_string_view_constructor_with_empty") {
+  string_view str = "";
+  req_result rr(str);
+  try {
+    auto ret = rr.as<std::string>();
+  } catch (const std::exception &ex) {
+    std::string ex_str = ex.what();
+    CHECK(ex_str.empty());
+  }
+}
+TEST_CASE("test_client_req_result_string_view_constructor_with_exception") {
+  string_view str =
+      "test_client_req_result_string_view_constructor_with_exception";
+  req_result rr(str);
+  try {
+    auto ret = rr.as<std::string>();
+  } catch (const std::exception &ex) {
+    std::string ex_str = ex.what();
+    CHECK_EQ(ex_str, "unpack failed: Args not match!");
+  }
 }
