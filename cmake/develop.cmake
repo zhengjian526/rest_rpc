@@ -19,6 +19,7 @@ if (ENABLE_SSL)
 endif()
 
 if (ENABLE_JAVA)
+    add_definitions(-DENABLE_JAVA)
     find_package(JNI REQUIRED)
     message(STATUS "Use Java")
 endif()

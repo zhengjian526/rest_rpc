@@ -110,7 +110,7 @@ public:
 
     return route_result;
   }
-
+  bool empty() { return key2func_name_.empty() && map_invokers_.empty(); }
   router() = default;
 
 private:

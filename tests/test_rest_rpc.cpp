@@ -24,6 +24,7 @@ struct person {
   MSGPACK_DEFINE(id, name, age);
 };
 person get_person(rpc_conn conn) { return {1, "tom", 20}; }
+std::string get_person_wrong_data(rpc_conn conn) { return "tom"; }
 
 void server_user_data(rpc_conn conn) {
   auto shared_conn = conn.lock();
@@ -31,6 +32,7 @@ void server_user_data(rpc_conn conn) {
     shared_conn->set_user_data(std::string("aa"));
     auto s = conn.lock()->get_user_data<std::string>();
     CHECK_EQ(s, "aa");
+    std::cout << "conn body size : " << conn.lock()->body().size() << std::endl;
   }
   return;
 }
@@ -154,6 +156,46 @@ TEST_CASE("test_client_sync_call") {
   CHECK(r);
   auto result = client.call<int>("add", 1, 2);
   CHECK_EQ(result, 3);
+}
+
+TEST_CASE("test_client_sync_call_return_wrong_data") {
+  rpc_server server(9000, std::thread::hardware_concurrency());
+  server.register_handler("get_person_wrong_data", get_person_wrong_data);
+  server.async_run();
+  std::this_thread::sleep_for(std::chrono::milliseconds(200));
+
+  rpc_client client("127.0.0.1", 9000);
+  bool r = client.connect();
+  CHECK(r);
+
+  client.set_error_callback(
+      [](asio::error_code ec) { std::cout << ec.message() << std::endl; });
+  std::string str = "test_client_async_call_return_wrong_data";
+  auto ret = client.call<std::string>("get_person_wrong_data");
+  try {
+    auto p = as<person>(ret);
+  } catch (const std::exception &ex) {
+    std::string ex_str = ex.what();
+    std::cout << ex_str << '\n';
+    CHECK_EQ(ex_str, "unpack failed: Args not match!");
+  }
+}
+
+TEST_CASE("test_client_sync_call_with_not_exist_rpc_name") {
+  rpc_server server(9000, std::thread::hardware_concurrency());
+  dummy d;
+  // server.register_handler("add", &dummy::add, &d);
+  server.async_run();
+  std::this_thread::sleep_for(std::chrono::milliseconds(200));
+
+  rpc_client client("127.0.0.1", 9000);
+  bool r = client.connect();
+  CHECK(r);
+  try {
+    auto result = client.call<int>("add", 1, 2);
+  } catch (const std::exception &e) {
+    std::cout << e.what() << '\n';
+  }
 }
 
 TEST_CASE("test_client_sync_call_return_void") {
@@ -517,4 +559,14 @@ TEST_CASE("test_client_req_result_string_view_constructor_with_exception") {
     std::string ex_str = ex.what();
     CHECK_EQ(ex_str, "unpack failed: Args not match!");
   }
+}
+
+TEST_CASE("test_server_router") {
+  router r;
+  r.register_handler<false>("get_person", get_person);
+  r.register_handler<false>("hello", hello);
+  CHECK(!r.empty());
+  r.remove_handler("hello");
+  r.remove_handler("get_person");
+  CHECK(r.empty());
 }
