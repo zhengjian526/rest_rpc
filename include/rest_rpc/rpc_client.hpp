@@ -280,6 +280,7 @@ public:
    * We use callback to handle the result is received, so we should not
    * add the future to the future map.
    */
+#ifdef ENABLE_JAVA
   long internal_async_call(const std::string &encoded_func_name_and_args) {
     auto p = std::make_shared<std::promise<req_result>>();
     uint64_t fu_id = 0;
@@ -295,7 +296,7 @@ public:
           MD5::MD5Hash32(encoded_func_name_and_args.data()));
     return fu_id;
   }
-
+#endif
   template <size_t TIMEOUT = DEFAULT_TIMEOUT, typename... Args>
   void async_call(const std::string &rpc_name,
                   std::function<void(asio::error_code, string_view)> cb,
