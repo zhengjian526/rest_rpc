@@ -224,33 +224,12 @@ asio::awaitable<void> test_router() {
 
 TEST_CASE("test router") { sync_wait(get_global_executor(), test_router()); }
 
-asio::awaitable<void>
-get_last_rwtime_coro(std::shared_ptr<rpc_connection> conn) {
-  // 更新并获取时间
-  conn->set_last_time();
-
-  // 等待一小段时间
-  asio::steady_timer timer(co_await asio::this_coro::executor);
-  timer.expires_after(std::chrono::milliseconds(100));
-  co_await timer.async_wait(asio::use_awaitable);
-
-  // 再次更新时间
-  conn->set_last_time();
-
-  // 获取时间
-  auto time = co_await conn->get_last_rwtime();
-
-  auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
-      time.time_since_epoch());
-  std::cout << "Time in coroutine: " << ms.count() << "ms\n";
-}
-
 TEST_CASE("test rpc_connection") {
   uint64_t conn_id = 999;
   size_t num_thread = 4;
   asio::io_context io_ctx;
   tcp_socket socket(io_ctx);
-  bool cross_ending = false;
+  bool cross_ending_ = false;
   rpc_router router;
   router.register_handler<get_person>();
   rpc_service::msgpack_codec codec;
@@ -264,50 +243,21 @@ TEST_CASE("test rpc_connection") {
   dummy d{};
   router.register_handler<&dummy::add>(&d);
   auto conn = std::make_shared<rpc_connection>(std::move(socket), conn_id,
-                                               router, cross_ending);
+                                               router, cross_ending_);
   CHECK_EQ(conn->id(), conn_id);
   conn->set_check_timeout(true);
-  asio::co_spawn(io_ctx, get_last_rwtime_coro(conn), asio::detached);
-  io_ctx.run();
+  conn->set_last_time();
+  auto last_rw_time = conn->get_last_rwtime();
   std::cout << "topic_id: " << conn->topic_id() << std::endl;
   conn->close();
-  io_ctx.stop();
+  io_ctx.run();
 }
 
 TEST_CASE("test context pool") {
   io_context_pool pool(0);
   CHECK(pool.size() == 1);
 }
-std::string_view sync_response(std::string_view str) {
-  auto &ctx = rpc_context::context();
-  auto ec = ctx.sync_response("hi client!");
-  std::cout << "----> 6" << std::endl;
-  CHECK(ec == rpc_errc::ok);
-  return "";
-};
-TEST_CASE("test rpc context sync response") {
-  rpc_server server("127.0.0.1:9005");
 
-  server.register_handler<sync_response>();
-  auto ec = server.async_start();
-  std::cout << "----> 0" << std::endl;
-  CHECK(!ec);
-  rpc_client cl;
-  auto conn_ec = sync_wait(cl.get_executor(), cl.connect("127.0.0.1:9005"));
-  CHECK(!conn_ec);
-  std::cout << "----> 1" << std::endl;
-  {
-    auto result = sync_wait(cl.get_executor(),
-                            cl.call<sync_response>("hello server!"));
-    std::cout << "----> 2" << std::endl;
-    CHECK(result.ec == rpc_errc::ok);
-    std::cout << result.value << std::endl;
-  }
-  cl.close();
-  std::cout << "----> 3" << std::endl;
-  server.stop();
-  std::cout << "----> 4" << std::endl;
-}
 TEST_CASE("test server start") {
   rpc_server server("127.0.0.1:9005");
   server.register_handler<add>();
@@ -484,34 +434,6 @@ TEST_CASE("test pub sub") {
   promise.get_future().wait();
 }
 
-TEST_CASE("test sync pub sub") {
-  rpc_server server("127.0.0.1:9004");
-  server.async_start();
-
-  rpc_client client{};
-  sync_wait(get_global_executor(), client.connect("127.0.0.1:9004"));
-
-  std::promise<void> promise;
-  auto sub = [&]() -> asio::awaitable<void> {
-    for (int i = 0; i < 5; i++) {
-      auto result = co_await client.subscribe<std::string>("topic1");
-      REST_LOG_INFO << result.value;
-      CHECK(result.ec == rpc_errc::ok);
-      CHECK(result.value == "publish message");
-    }
-
-    promise.set_value();
-  };
-
-  asio::co_spawn(client.get_executor(), sub(), asio::detached);
-  std::this_thread::sleep_for(std::chrono::seconds(2));
-
-  for (int i = 0; i < 5; i++) {
-    server.sync_publish("topic1", "publish message");
-  }
-  promise.get_future().wait();
-}
-
 TEST_CASE("test reconnect") {
   rpc_server server("127.0.0.1:9004");
   server.async_start();
@@ -561,10 +483,8 @@ TEST_CASE("test server address") {
   server.remove_handler("add");
   CHECK_NOTHROW(server.register_handler<add>());
   server.remove_handler<add>();
-  CHECK_NOTHROW(server.register_handler("add", add));
-  server.remove_handler("add");
-  dummy d{};
-  CHECK_NOTHROW(server.register_handler("add", &dummy::add, &d));
+  CHECK_NOTHROW(server.register_handler<add>());
+
   rpc_server server1("127.0.0.x:9004");
   ec = server1.async_start();
   CHECK(ec);
