@@ -69,9 +69,8 @@ template <auto func> asio::awaitable<void> response(auto ctx) {
 }
 
 std::string_view delay_response(std::string_view str) {
-  auto &ctx = rpc_context::context();
+  rpc_context ctx;
   // set_delay before response in another thread
-  ctx.set_delay(true);
 
   // std::thread thd([ctx = std::move(ctx)]() mutable {
   //   std::this_thread::sleep_for(std::chrono::seconds(2));
@@ -113,6 +112,66 @@ asio::awaitable<void> no_arg_coro() {
 asio::awaitable<std::string> no_arg_coro1() {
   std::cout << "no args\n";
   co_return "test";
+}
+
+std::string delay_response1(std::string_view str) {
+  rpc_context ctx; // right, created in io thread.
+  async_start(ctx.get_executor(), ctx.response(std::string(str)));
+
+  return "";
+}
+
+asio::awaitable<std::string> delay_response2(std::string_view str) {
+  auto coro = []() -> asio::awaitable<void> {
+    rpc_context ctx; // rpc_context init will be failed, it should be defined in
+                     // io thread.
+    auto ret = co_await ctx.response("test");
+    REST_LOG_INFO << ret.message();
+    CHECK(ret);
+  };
+  sync_wait(get_global_executor(), coro());
+
+  rpc_context ctx;
+  co_await ctx.response(str);
+  auto ret = co_await ctx.response(str);
+  CHECK(ret);
+
+  co_return "";
+}
+
+std::string delay_response3(std::string str) {
+  rpc_context ctx;
+  std::thread thd([ctx = std::move(ctx), str]() mutable {
+    sync_wait(ctx.get_executor(), ctx.response(std::move(str)));
+  });
+  thd.detach();
+
+  return "";
+}
+
+TEST_CASE("test delay response") {
+  using T = return_type_t<int>;
+  rpc_server server("127.0.0.1:9005");
+  server.register_handler<delay_response1>();
+  server.register_handler<delay_response2>();
+  server.register_handler<delay_response3>();
+  server.async_start();
+  rpc_client client;
+  sync_wait(client.get_executor(), client.connect("127.0.0.1:9005"));
+  auto result =
+      sync_wait(client.get_executor(), client.call<delay_response1>("test"));
+  CHECK(result.value == "test");
+  auto result1 =
+      sync_wait(client.get_executor(), client.call<delay_response2>("test"));
+  CHECK(result1.value == "test");
+  result1 =
+      sync_wait(client.get_executor(), client.call<delay_response2>("test"));
+  CHECK(result1.value == "test");
+  auto result2 = sync_wait(
+      client.get_executor(),
+      client.call_for<delay_response3>(std::chrono::minutes(2), "test"));
+  CHECK(result2.value == "test");
+  server.stop();
 }
 
 // TODO: client pool
@@ -182,11 +241,10 @@ asio::awaitable<void> test_router() {
     auto ret2 = co_await router.route(get_key<&dummy::echo_coro>(), "test");
     CHECK(ret2.ec == rpc_errc::ok);
   }
-  rpc_service::msgpack_codec codec;
 
   {
-    auto s = codec.pack_args(1);
-    auto s1 = codec.pack_args("test");
+    auto s = rpc_codec::pack_args(1);
+    auto s1 = rpc_codec::pack_args("test");
     auto r = co_await router.route(get_key<round1>(), s);
     auto r1 = co_await router.route(get_key<echo>(), s1);
 
@@ -195,7 +253,7 @@ asio::awaitable<void> test_router() {
     std::cout << "\n";
   }
 
-  auto args = codec.pack_args(1, 2);
+  auto args = rpc_codec::pack_args(1, 2);
   std::string_view str(args.data(), args.size());
 
   {
@@ -204,12 +262,12 @@ asio::awaitable<void> test_router() {
     std::cout << "\n";
   }
 
-  auto args1 = codec.pack_args("it is a test");
+  auto args1 = rpc_codec::pack_args("it is a test");
   std::string_view str1(args1.data(), args1.size());
 
   {
     auto result = co_await router.route(get_key<&dummy::add>(), str);
-    auto r = codec.unpack<int>(result.result);
+    auto r = rpc_codec::unpack<int>(result.result);
     auto result1 = co_await router.route(get_key<&dummy::foo>(), str1);
     CHECK(r == 3);
     CHECK(result1.ec == rpc_errc::ok);
@@ -253,14 +311,13 @@ TEST_CASE("test rpc_connection") {
   bool cross_ending = false;
   rpc_router router;
   router.register_handler<get_person>();
-  rpc_service::msgpack_codec codec;
+
   person p{1, "tom", 20};
 
-  auto buf = codec.pack_to_string(std::tuple(p));
+  auto buf = rpc_codec::pack_args(p);
   auto ret = sync_wait(get_global_executor(),
                        router.route(get_key<get_person>(), buf));
-  auto tp =
-      codec.unpack<std::tuple<person>>(ret.data().data(), ret.data().size());
+  auto tp = rpc_codec::unpack<std::tuple<person>>(ret.data());
   dummy d{};
   router.register_handler<&dummy::add>(&d);
   auto conn = std::make_shared<rpc_connection>(std::move(socket), conn_id,
@@ -327,12 +384,12 @@ TEST_CASE("test server start") {
 
   static_assert(util::CharArrayRef<char const(&)[5]>);
   static_assert(util::CharArray<const char[5]>);
-  rpc_service::msgpack_codec::pack_args();
-  rpc_service::msgpack_codec::pack_args(1, 2);
-  auto s1 = rpc_service::msgpack_codec::pack_args("test");
-  auto s2 = rpc_service::msgpack_codec::pack_args(std::string_view("test2"));
-  auto s3 = rpc_service::msgpack_codec::pack_args(std::string("test2"));
-  auto s5 = rpc_service::msgpack_codec::pack_args(123);
+  rpc_codec::pack_args();
+  rpc_codec::pack_args(1, 2);
+  auto s1 = rpc_codec::pack_args("test");
+  auto s2 = rpc_codec::pack_args(std::string_view("test2"));
+  auto s3 = rpc_codec::pack_args(std::string("test2"));
+  auto s5 = rpc_codec::pack_args(123);
 
   //  auto future = asio::co_spawn(cl.get_executor(),
   //  cl.connect("127.0.0.1:9005"), asio::use_future); auto conn_ec =
@@ -576,6 +633,45 @@ TEST_CASE("test server address") {
   std::thread thd2([&] { server2.stop(); });
   thd2.join();
   thd.join();
+}
+
+bool in_user_pack = false;
+bool in_user_unpack = false;
+namespace user_codec {
+// adl lookup in user_codec namespace
+template <typename... Args>
+std::string serialize(rest_adl_tag, Args &&...args) {
+  in_user_pack = true;
+  msgpack::sbuffer buffer(2 * 1024);
+  if constexpr (sizeof...(Args) > 1) {
+    msgpack::pack(buffer, std::forward_as_tuple(std::forward<Args>(args)...));
+  } else {
+    msgpack::pack(buffer, std::forward<Args>(args)...);
+  }
+
+  return std::string(buffer.data(), buffer.size());
+}
+
+template <typename T> T deserialize(rest_adl_tag, std::string_view data) {
+  try {
+    in_user_unpack = true;
+    static msgpack::unpacked msg;
+    msgpack::unpack(msg, data.data(), data.size());
+    return msg.get().as<T>();
+  } catch (...) {
+    return T{};
+  }
+}
+} // namespace user_codec
+
+TEST_CASE("test user codec") {
+  auto buf = rpc_codec::pack_args(
+      std::make_tuple<int, std::string, int>(1, "tom", 20));
+  CHECK(in_user_pack);
+
+  std::string_view str(buf.data(), buf.size());
+  rpc_codec::unpack<std::tuple<int, std::string, int>>(str);
+  CHECK(in_user_unpack);
 }
 
 // doctest comments
