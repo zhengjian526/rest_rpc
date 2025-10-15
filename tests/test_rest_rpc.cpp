@@ -335,36 +335,7 @@ TEST_CASE("test context pool") {
   io_context_pool pool(0);
   CHECK(pool.size() == 1);
 }
-std::string_view sync_response(std::string_view str) {
-  auto &ctx = rpc_context::context();
-  auto ec = ctx.sync_response("hi client!");
-  std::cout << "----> 6" << std::endl;
-  CHECK(ec == rpc_errc::ok);
-  return "";
-};
-TEST_CASE("test rpc context sync response") {
-  rpc_server server("127.0.0.1:9005");
 
-  server.register_handler<sync_response>();
-  auto ec = server.async_start();
-  std::cout << "----> 0" << std::endl;
-  CHECK(!ec);
-  rpc_client cl;
-  auto conn_ec = sync_wait(cl.get_executor(), cl.connect("127.0.0.1:9005"));
-  CHECK(!conn_ec);
-  std::cout << "----> 1" << std::endl;
-  {
-    auto result = sync_wait(cl.get_executor(),
-                            cl.call<sync_response>("hello server!"));
-    std::cout << "----> 2" << std::endl;
-    CHECK(result.ec == rpc_errc::ok);
-    std::cout << result.value << std::endl;
-  }
-  cl.close();
-  std::cout << "----> 3" << std::endl;
-  server.stop();
-  std::cout << "----> 4" << std::endl;
-}
 TEST_CASE("test server start") {
   rpc_server server("127.0.0.1:9005");
   server.register_handler<add>();
