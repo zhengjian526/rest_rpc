@@ -19,6 +19,11 @@ rest_rpc是一个高性能、易用、跨平台、header only的基于c++20 协�
 
 可以快速上手，使用者只需要关注自己的业务逻辑即可。
 
+# 编译器版本
+需要完全支持c++20 的编译器：
+
+gcc12+, clang15+, msvc2022
+
 # 谁在用rest_rpc
 
 1. 博世汽车
@@ -117,7 +122,9 @@ int main(){
 }
 ```
 
-## 发布订阅
+## 酷
+rest_rpc 比较有特色的一个功能是支持订阅发布。
+
 以订阅某个topic为例：
 
 server 端代码：
@@ -135,7 +142,8 @@ void publish() {
         break;
       }
       
-      co_await server.publish("topic1", str);// 向客户端发布一个string，你也可以发布一个对象，内部会自动序列化
+      // 向客户端发布一个string，你也可以发布一个对象，内部会自动序列化
+      co_await server.publish("topic1", str);
     }
   };
   
@@ -173,7 +181,9 @@ rest_rpc是目前最快的rpc库，具体和grpc和brpc做了性能对比测试�
 
 https://github.com/qicosmos/rest_rpc/tree/master/tests/bench.cpp
 
-## 使用自己的序列化库
+## 活
+rest_rpc 也是比较灵活的，允许用户替换默认的序列化库。
+
 rest_rpc 默认使用yalantinglibs的struct_pack 去做系列化/反序列化的，它的性能非常好。
 
 rest_rpc 也支持用户使用自己的序列化库，只需要去实现一个序列化和一个反序列化函数。
@@ -210,7 +220,6 @@ rest_rpc 也支持用户使用自己的序列化库，只需要去实现一个�
 可以参考rest_rpc的example:
 
 https://github.com/qicosmos/rest_rpc/tree/master/examples
-
 
 ## 社区和群
 purecpp.cn
