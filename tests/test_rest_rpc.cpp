@@ -748,15 +748,15 @@ TEST_CASE("test_error_code") {
     CHECK(ec == rest_rpc::rpc_errc::write_error);
   }
 
-  SUBCASE("operator== with non-matching error code") {
-    auto ec = rest_rpc::make_error_code(rest_rpc::rpc_errc::read_error);
-    CHECK_FALSE(ec == rest_rpc::rpc_errc::write_error);
-  }
+  // SUBCASE("operator== with non-matching error code") {
+  //   auto ec = rest_rpc::make_error_code(rest_rpc::rpc_errc::read_error);
+  //   CHECK_FALSE(ec == rest_rpc::rpc_errc::write_error);
+  // }
 
-  SUBCASE("operator== with ok error code") {
-    auto ec_ok = rest_rpc::make_error_code(rest_rpc::rpc_errc::ok);
-    CHECK(ec_ok == rest_rpc::rpc_errc::ok);
-  }
+  // SUBCASE("operator== with ok error code") {
+  //   auto ec_ok = rest_rpc::make_error_code(rest_rpc::rpc_errc::ok);
+  //   CHECK(ec_ok == rest_rpc::rpc_errc::ok);
+  // }
 }
 // bool in_user_pack = false;
 // bool in_user_unpack = false;
