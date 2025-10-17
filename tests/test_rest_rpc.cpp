@@ -255,7 +255,7 @@ get_last_rwtime_coro(std::shared_ptr<rpc_connection> conn) {
   co_await timer.async_wait(asio::use_awaitable);
 
   conn->set_last_time();
-  
+
   auto time = co_await conn->get_last_rwtime();
 
   auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
