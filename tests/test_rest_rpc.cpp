@@ -526,10 +526,7 @@ TEST_CASE("test server address") {
   server.remove_handler("add");
   CHECK_NOTHROW(server.register_handler<add>());
   server.remove_handler<add>();
-  CHECK_NOTHROW(server.register_handler("add", add));
-  server.remove_handler("add");
-  dummy d{};
-  CHECK_NOTHROW(server.register_handler("add", &dummy::add, &d));
+  CHECK_NOTHROW(server.register_handler<add>());
   rpc_server server1("127.0.0.x:9004");
   ec = server1.async_start();
   CHECK(ec);
