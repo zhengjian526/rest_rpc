@@ -248,18 +248,14 @@ TEST_CASE("test router") { sync_wait(get_global_executor(), test_router()); }
 
 asio::awaitable<void>
 get_last_rwtime_coro(std::shared_ptr<rpc_connection> conn) {
-  // 更新并获取时间
   conn->set_last_time();
 
-  // 等待一小段时间
   asio::steady_timer timer(co_await asio::this_coro::executor);
   timer.expires_after(std::chrono::milliseconds(100));
   co_await timer.async_wait(asio::use_awaitable);
 
-  // 再次更新时间
   conn->set_last_time();
-
-  // 获取时间
+  
   auto time = co_await conn->get_last_rwtime();
 
   auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
@@ -571,12 +567,10 @@ TEST_CASE("test_string_view_array_has_func") {
 }
 
 #ifdef _MSC_VER
-// MSVC 编译器支持这些调用约定
 void __cdecl test_cdecl_func() {}
 void __stdcall test_stdcall_func() {}
 void __fastcall test_fastcall_func() {}
 #else
-// GCC/Clang 使用不同的属性语法或不支持这些调用约定
 void test_cdecl_func() {}
 void test_stdcall_func() {}
 void test_fastcall_func() {}
@@ -599,7 +593,6 @@ template <> struct qualified_name_of<normal_func> {
   static constexpr std::string_view value = "normal_func";
 };
 
-// 添加边界情况的特化
 struct TestStruct {};
 template <> struct qualified_name_of<TestStruct{}> {
   static constexpr std::string_view value = "__thiscall TestStruct::method";
@@ -619,7 +612,6 @@ TEST_CASE("test_get_func_name") {
   constexpr auto fastcall_name = get_func_name<test_fastcall_func>();
   CHECK(fastcall_name == "test_fastcall_func");
 
-  // 测试普通函数名
   constexpr auto normal_name = get_func_name<normal_func>();
   CHECK(normal_name == "normal_func");
 
